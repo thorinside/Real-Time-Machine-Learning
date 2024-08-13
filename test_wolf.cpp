@@ -1,6 +1,6 @@
 // test_wolf.cpp -- main program to test Learning Feature Trees using WOLF approximation for machine learning
 /*
-Copyright (c) 2024 William Ward Armstrong All rights reserved except as in the folloting Software License
+Copyright (c) 2024 William Ward Armstrong
 MIT License
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -12,7 +12,6 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-//const char* train_image_path = "C:\\Users\\arms\\Documents\\AI2test\\Working
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -45,7 +44,7 @@ void loadMNISTdata();
 double reinforcement(uint8_t action, uint8_t label);
 void testOnTRAINING_SET(int numberLF_trees, cLF_tree** apLF_tree);
 void testOnTEST_SET(int numberLF_trees, cLF_tree** apLF_tree);
-void view(mnist_image_t* pimage, uint8_t label);
+void view(mnist_image_t* pimage, uint8_t label); // Shows crude copies of the badly classified MNIST test images
 
 int main(int argc, char* argv[])
 {
@@ -65,26 +64,26 @@ int main(int argc, char* argv[])
     numberLF_trees = atoi(argv[3]); // We grow a number of trees, some for different tasks, some to increase accuracy for a task.
     minSamples2Split = atoi(argv[4]); // A block with fewer samples can't split
     constancyLimit = atoi(argv[5]); // The closer this is to zero, the fewer variables are removed as "deemed constant"
-    convolutionRadius= atof(argv[6]); // This merely increases the variance of some sensor values on a block, but may be like adding some new samples
+    convolutionRadius= atof(argv[6]); // This seemed to improve generalization
     loadMNISTdata();
-    createKernel(); // This is for the convolution operation on *features* not images
+    createKernel(); // This is for the convolution operation on *features*, not images
     // Creating LF_trees  ***************************************************************************
-    initCentroidSampleNumbers(nSensors); // This finds the centroid of the values of sensors once for all the trees
+    initCentroidSampleNumbers(nSensors); //sets up two vectors: initC and image_numbers_setup that initialize trees
     // Using several trees improves the statistical average when the trees are shifted copies of the original tree or at least different
     std::cout << "Creating array of " << numberLF_trees << " Learning Feature Trees.\n";
     auto apLF_tree = (cLF_tree**)malloc(numberLF_trees * sizeof(cLF_tree*));
     auto start_first_tree = std::chrono::steady_clock::now();
     double tparallel = 0; // This is the maximum time to grow a single Learning Feature Tree during program execution.
-    // In a parallel system, this would be the time growing all trees. For example if running this program takes an hour
-    // to learn to recognize the 60000 MNIST numerals, parallel growing the trees could take only, say, 30 seconds, or even much less time.
+    // In a parallel system, this would be the time growing all trees. For example if growing 200 LF-trees takes 40 minutes
+    // to learn to classify the 60000 MNIST numerals, growing the trees in parallel would take only 12seconds, and much less if the parallel code were optimized.
     for (treeNo = 0; treeNo < numberLF_trees; ++treeNo)
     {
         if (treeNo < numberLF_trees)
         {
-            apLF_tree[treeNo] =create_LF_tree();
+            apLF_tree[treeNo] = create_LF_tree();
             apLF_tree[treeNo]->setTreeNumber(treeNo);
             apLF_tree[treeNo]->setSensorNumber(nSensors);
-            int SBcount = 0; // SB stands for Sample Block. It is a block in the partition created by the Learning Feature Tree.
+            int SBcount = 0; // SB stands for Sample Block. It is a block in the partition created by the hyperplanes of a Learning Feature Tree.
             // Grow an LF_tree  **************************************
            // std::cout << "\nStarting growth of Learning Feature Tree number " << treeNo << std::endl;
             const auto start_tree = std::chrono::steady_clock::now();
@@ -99,7 +98,7 @@ int main(int argc, char* argv[])
             std::cout << "Growing tree " << treeNo << " took "  << elapsed0.count() << " sec. Elapsed " << elapsed1.count() <<
                 " sec. To go (est.) " << ceil(elapsed1.count() * (numberLF_trees - treeNo - 1)/((treeNo +1) * 60.0)) << " min." << std::endl;
         }
-      } // End of for loop building a number of LF_trees
+      } // End of for loop growing a number of LF_trees
     auto end_last_tree = std::chrono::steady_clock::now();
     auto trainTime = std::chrono::duration_cast<std::chrono::seconds>(end_last_tree - start_first_tree);
     std::cout << "\n\nProject name " << ProjectName << "\nNumber of pixels in retina                        " << argv[2] << 
@@ -116,21 +115,23 @@ int main(int argc, char* argv[])
     std::cout << "\n\nResults on TEST DATA (the one that counts!)\n";
     testOnTEST_SET(numberLF_trees, apLF_tree);
     free(apLF_tree);
-}  // End of main program
+}  // End of main routine and the program run
 
-double reinforcement(uint8_t action, uint8_t label)
+double reinforcement(uint8_t action, uint8_t label)  // This training is done by the trainer who knows only the system's action and the label
 {
-    // return (action == label) ? 1 : 0; // The mean reinforcement should be about 0.1 // What digit is it?  95.69% correct
-    return((label == (uint8_t)(treeNo % 10) && action == label) || (label != (uint8_t)(treeNo % 10) && action != (uint8_t)(treeNo % 10))) ? 1 : 0; // What digit is it? 99.32 % correct
-    // Note: in the above case, one has to do an extra step and count as bad decisions those cases where the action and the tree output are different.
+       return (action == label) ? 1 : 0; // What digit is it?  95.95% correct
+    // return (label == (uint8_t) (treeNo % 10) ) ? 1 : 0; // The action is always treeNo % 10. What digit is it? 95.95% correct. 
     // return (((label == 3 || label == 8) && action == 1) || ((label != 3 && label != 8) && action != 1)) ? 1 : 0; // Answer 1 or 0:Is it an 8 or a 3? 98.3% correct
     // return (((label == 4 || label == 9) && action == 1) || ((label != 4 && label != 9) && action != 1)) ? 1 : 0; // Answer 1 or 0: Is it a 4 or a 9? 98.86% correct
     // return  (((label == 2 || label == 3 || label == 5 || label == 7 || label == 8 || label == 9) && action == 1) || !(label == 2 || label == 3 || label == 5 || label == 7 || label == 8 || label == 9) && action != 1); // Indicate..
     // by a 1 that there is a sort of bar across the top. Any other output means there isn't a bar. 97.9% correct
-    //return ((int) label < 5 && action == label)||((int) label > 4)&& ((int)action > 4) ? 1 : 0; // Concentrate on numerals 0 to 4: What digit is it? 96.04%
-    //return((label == 5 && action == label) || (label != 5 && action != 5)) ? 1 : 0; //Just do 5's : Is it a 5? 98.76% correct
-    //return((label == (uint8_t)(treeNo % 10) && action == label) || (label != (uint8_t)(treeNo % 10) && action != (uint8_t)(treeNo % 10) && label != 0 && action != 0)) ? 1 : 0; //What digit is it
-    //-- using error matrix on training set still gives the imperfect result 99.32%?
+    // return ((int) label < 5 && action == label)||((int) label > 4)&& ((int)action > 4) ? 1 : 0; // Concentrate on numerals 0 to 4: What digit is it? 96.04%
+    // return((label == 5 && action == label) || (label != 5 && action != 5)) ? 1 : 0; //Just do 5's : Is it a 5? 98.76% correct
+    // return  (((label == 2 || label == 3 || label == 5 || label == 7 || label == 8 || label == 9 || label == 0) && action == 1) || !(label == 2 || label == 3 || label == 5 || label == 7 || label == 8 || label == 9 || label == 0) && action != 1); 
+    // We believe that using several of tests to analyze the image and putting the information together with the probabilities above, one can improve the classification.
+    // N.B. The following reinforcement is "illegal" because the teacher should only know the action and the label, not the treeNo.
+    // return((label == (uint8_t)(treeNo % 10) && action == label) || (label != (uint8_t)(treeNo % 10) && action != (uint8_t)(treeNo % 10))) ? 1 : 0; // This is cheating! 99.32 % correct
+    // The above incorrectly assumes the teacher knows the treeNo % 10, so it is not reinforcement learning. The part after the || does not say the action decided the label correctly!!
 }
 
 void loadMNISTdata()
@@ -209,7 +210,7 @@ void testOnTEST_SET(int numberLF_trees, cLF_tree** apLF_tree)
         }
         else
         {
-            if (reinforcement(chosenAction, label) == 1) // Has the system learned the behaviour that was positively reinforced?
+            if (reinforcement(chosenAction, label) == 1)   // Has the system learned the behaviour that was positively reinforced?
             {
                 ++goodDecisions;
             }
@@ -299,7 +300,7 @@ void testOnTRAINING_SET(int numberLF_trees, cLF_tree** apLF_tree)
         }
         else
         {
-            if (reinforcement(chosenAction, label) == 1) // Has the system learned the behaviour that was positively reinforced?
+            if (reinforcement(chosenAction, label) == 1)  // Has the system learned the behaviour that was positively reinforced?
             {
                 ++goodDecisions;
             }

@@ -1,5 +1,5 @@
 /* wolf.h
-Copyright (C) 2024 William Ward Armstrong All rights reserved except as in following software license
+Copyright (C) 2024 William Ward Armstrong
  MIT License
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,17 +29,16 @@ SOFTWARE. */
 extern int numberLF_trees;
 extern int minSamples2Split;
 extern int constancyLimit ;
+extern double convolutionRadius;
 extern size_t treeNo;
 extern double reinforcement(uint8_t action, uint8_t label);
-long leafCount{0}; // Counts the number of Sample Block (SB) nodes which have linear functions
-// as destinguished from the nodes on vector m_SB that support access to SB leaves by a feature tree structure.
+long leafCount{0}; // Counts the number of leaf Sample Blocks (SB), i.e. nodes which compute probabilities and are not used for branching
 bool treeFinal{ false }; // Signals the end of tree growth.
 size_t non_ID{0x3777777777 };
 extern mnist_image_t* train_images;
 extern uint8_t* train_labels;
-extern double convolutionRadius;
 std::vector<double> initC{}; // Each tree has this starting centroid of all samples which may then
-// shift a bit so the samples in the blocks are different. Aids speed..
+// shift a bit so the samples in the blocks become different.
 std::vector<size_t> image_numbers_setup{}; // Aids speed.
 std::array <double, 49> kernel; // A convolution kernel.
      // Comnvolution may improve results on the test set with no speed penalty.
@@ -47,7 +46,7 @@ void initCentroidSampleNumbers(int nSensors);
 // In what follows, S (D) means less (greater than or equal to) the features-computed value.
 // One can think of it as to the left or right on the axis. Latin: Sinister = left, Dexter = right.
 
-struct SF
+struct SF // Used for features
 {
     size_t sensor;
     double factor;
@@ -57,23 +56,23 @@ struct SB  // The Sample Blocks are of two types: 1. feature nodes that partitio
            // and 2. leaf blocks with linear functions as membership functions giving the probability of the target class.
            // When a leaf block is split in two by a feature, it becomes a feature block with the two resulting blocks as leaf children.
 {
-    bool   is_final {false};                                  /* Initially false; true when SB can't change/split   */
-    std::vector<double> C{};                          /* Centroid vector, C[nSensors] is output centroid */
-    std::vector<double> W{};                         /* Weight vector for active domain components      */
-    std::vector<size_t> active;                        /* list of pixels deemed non-constant on a block      */
-    std::vector<size_t> image_numbers{};  /* a list of indices of images in train_images             */
-    std::vector<SF>  features;                        /* A feature vector is at a node of the feature tree    */
-    double FTvalue{};                                      /* Value used at a branch of a feature tree                */
-    size_t FTS {non_ID};                                  /* Left SBid stored at a branching of a feature tree   */
-    size_t FTD{non_ID};                                   /* Right SBid at a feature tree branching                  */
-    size_t FTparent{ non_ID };                        /* The parent of this block in the feature tree           */
+    bool   is_final {false};                          /* Initially false; true when SB can't change/split   */
+    std::vector<double> C{};                          /* Centroid vector, C[nSensors] is output centroid    */
+    std::vector<double> W{};                          /* Weight vector for active domain components         */
+    std::vector<size_t> active;                       /* list of pixels deemed non-constant on a block      */
+    std::vector<size_t> image_numbers{};              /* a list of indices of images in train_images        */
+    std::vector<SF>  features;                        /* A feature vector is at a node of the feature tree  */
+    double FTvalue{};                                 /* Value used at a branch of a feature tree           */
+    size_t FTS {non_ID};                              /* Left SBid stored at a branching of a feature tree   */
+    size_t FTD{non_ID};                               /* Right SBid at a feature tree branching              */
+    size_t FTparent{ non_ID };                        /* The parent of this block in the feature tree        */
  }; 
 
 class cLF_tree
 {
     // Data members
-    size_t m_treeNo{ 0 };                  // The number of the current tree. Its associated action is  m_treeNo % 10;
-    uint32_t m_nSensors{784};                // Number of sensors (pixels) of MNIST data
+    size_t m_treeNo{ 0 };                  // The number of the current tree. Its associated action is  m_treeNo % 10 when sed for MNIST classification;
+    uint32_t m_nSensors{784};              // Number of sensors (pixels) of MNIST data
     std::vector<SB> m_SB{};                // Vector to contain all SB structs
 
 public: // Methods
@@ -97,6 +96,7 @@ public: // Methods
     void    makeFTnode(size_t SBid);
     void    convolution( std::vector<SF>& featureVector);
 };
+
 cLF_tree* create_LF_tree()
 {
     // A Learning Feature tree partitions the training samples in several stages so two classes, targets
@@ -147,14 +147,14 @@ void cLF_tree::addTRsample(mnist_image_t* pImage, size_t imageNo)
 size_t  cLF_tree::createSB() // The splitting SB at pointer pSB leads to creation and initialization of a new SB
 {
     uint32_t nSensors = m_nSensors;
-    size_t SBid = m_SB.size();                 // Get the unique identifier, or index, of a sample block (SB).
-    m_SB.push_back(SB());                      // Add the new SB to the vector m_SB of all SBs (including those used as feature tree nodes)
-    m_SB[SBid].is_final = false;               // A final SB does not change any more
-    m_SB[SBid].C.assign(nSensors + 1, 0);    // The centroid ( or engram) of the images on the block, a vector including the output centroid at index nSensors
+    size_t SBid = m_SB.size();               // Get the unique identifier, or index, of a sample block (SB).
+    m_SB.push_back(SB());                    // Add the new SB to the vector m_SB of all SBs (including those used as feature tree nodes)
+    m_SB[SBid].is_final = false;             // A final SB does not change any more
+    m_SB[SBid].C.assign(nSensors + 1, 0);    // The centroid ( an engram) of the images on the block, a vector including the output centroid at index nSensors
     m_SB[SBid].W.assign(nSensors + 1, 0);    // The weights on nSensors inputs of the linear function on a block. The W indices, like those of C, don't change due to inactivity of sensors
-    m_SB[SBid].FTS = non_ID;                   // non_ID is a huge size_t value that indicates a not initialized left branch of a feature tree. (S = sinister in Latin = left ).
-    m_SB[SBid].FTD = non_ID;                   // Indicates the above for the right branch. (D = dexter in Latin)
-    m_SB[SBid].FTvalue = 0;                    // This is the split value at a node of the feature tree, the value of the SB's feature at the centroid vector of the SB.
+    m_SB[SBid].FTS = non_ID;                 // non_ID is a huge size_t value that indicates a not initialized left branch of a feature tree. (S = sinister in Latin = left ).
+    m_SB[SBid].FTD = non_ID;                 // Indicates the above for the right branch. (D = dexter in Latin)
+    m_SB[SBid].FTvalue = 0;                  // This is the split value at a node of the feature tree, the value of the SB's feature at the centroid vector or other placement.
     m_SB[SBid].active.clear();
     if (SBid == 0)
     {
@@ -164,11 +164,11 @@ size_t  cLF_tree::createSB() // The splitting SB at pointer pSB leads to creatio
             m_SB[SBid].active.push_back(sensor);
         }
     }
-    ++leafCount; // Creates one additional SB
+    ++leafCount; // Creates one additional leaf SB
     return SBid;
 } // End of createSB
 
-void initCentroidSampleNumbers(int nSensors)
+void initCentroidSampleNumbers(int nSensors) //sets up two vectors: initC and image_numbers_setup that initialize trees
 {
     mnist_image_t* pimage = nullptr;
     double accuC = 0;
@@ -180,9 +180,10 @@ void initCentroidSampleNumbers(int nSensors)
         {
             accuC += (double)(train_images + imageNo)->pixels[sensor];
         }
-        initC[sensor] = accuC / 60000.0; // initC will be used to initialize LFid = 0 of all trees after being set on the first tree
+        initC[sensor] = accuC / 60000.0; 
     }
     for (size_t s = 0; s < 60000; ++s) image_numbers_setup.push_back(s);
+    // initC and image_numbers_setup will speed up initialization of SampleBlock SBid = 0 of all trees
 } // End of initCentroidSampleNumbers
 
 void cLF_tree::growTree()
@@ -195,7 +196,7 @@ void cLF_tree::growTree()
     // This routine does four things with image and label data in collaboration with two other routines: createFeature and splitSB.
     // 1. It takes the precomputed centroid of domain dimensions for SB 0 and adds some shifts. The centroids of other SB are computed in splitSB.
     // 2. It determines the variances of the image samples' active component dimensions to support step 3.
-    // 3. It removes some domain dimensions whose values vary little and are "deemed constant" over an SB block, 
+    // 3. It removes some domain dimensions whose values vary little in the samples of the block and are "deemed constant" over an SB block, 
     // 4. It finds the weights of linear functions with domain SB to fit the data based on the remaining active dimensions.
     uint32_t nSensors = m_nSensors; // This is the number of domain coordinates (number of pixels in an image = size of retina)
     size_t sensor{ 0 };
@@ -204,8 +205,7 @@ void cLF_tree::growTree()
     size_t SBid{ 0 };
     size_t imageNo{ 0 }; // This is the index of the image and its label in the MNIST training data files of images and labels
     size_t local_imageNo{ 0 }; //This is the index of image numbers (imageNo values) which are stored with the SB.
-    double  y{ 0 }; // y is the reinforcement for the given action and image.
-    // For reinforcement learning, it is the reinforcement for the label and the action (treeNo % 10) associated with the SB tree. 
+    double  y{ 0 }; // y is the reinforcement for the given action and image label.
     std::vector<size_t> stayActive{}; // This temporarily records the remaining active sensors prior to elimination of some from the active list
     double accu = 0;
     std::vector<int> sign{};
@@ -236,7 +236,7 @@ void cLF_tree::growTree()
             while (local_imageNo < m_SB[SBid].image_numbers.size())
             {
                 imageNo = m_SB[SBid].image_numbers[local_imageNo];
-                Ey += reinforcement((uint8_t) m_treeNo % 10, train_labels[imageNo]);
+                Ey += reinforcement((uint8_t) m_treeNo % 10, train_labels[imageNo]); // ?? this may only be correct for classifying all digits
                 ++local_imageNo;
             }
             En = (double) m_SB[SBid].image_numbers.size();
@@ -269,20 +269,17 @@ void cLF_tree::growTree()
                 m_SB[SBid].C[nSensors] = Ey; // This is the mean value of the output component of the centroid for this SB
                 // Compute the mean value and variance of intensity for each active sensor. 
                 // Low variance entails making the sensor inactive on the SB ( and hence on all results of splitting SB).
+                // An inactive sensor doesn't participate in features of a block.
                 // Determine which variables are deemed constant over this SB (by the constancy criterion).
                 double Variance = Ex2 - Ex * Ex;
                 if (Variance > constancyLimit * constancyLimit) // Variance test: we need following values only for sensors that aren't deemed constant on the SB block.
                 {
-                    // The sensor can stay active if its values are not concentrated around one value
-                    // as just determined in the variance test.
                     stayActive.push_back(sensor); // Record the fact that this sensor is not considered constant
                     // If this SB can't split, we need the weights of the active sensors
                     m_SB[SBid].W[sensor] = (Exy - Ex * Ey) / Variance;
                 }
                 ++sensorIndex;
             }
-            //std::cout << " C[nSensors] = " << m_SB[SBid].C[nSensors];
-            // REMOVING DEEMED-CONSTANT SENSORS FROM THIS BLOCK
             m_SB[SBid].active.clear(); // Remove the constant sensors on block SBid starting by clearing the active vector
             size_t j = 0;
             while (j < stayActive.size())
@@ -396,7 +393,6 @@ void cLF_tree::createFeature(size_t SBid)
         if (minSD > sensorDiff) minSD = sensorDiff;
         ++sensorIndex;
     }
-    //std::cout << " maxSD " << maxSD << " minSD " << minSD;
     // Pick out features                                                                  
     int featureCount = 0;
     sensorIndex = 0;
@@ -517,7 +513,7 @@ void cLF_tree::createFeature(size_t SBid)
     case 2: m_SB[SBid].FTvalue = maxNFS; break;
     case 3: m_SB[SBid].FTvalue = minTFS; break;
     case 4: m_SB[SBid].FTvalue = maxTFS; break;
-    case 5:/* featureSum = 0;
+    case 5:/* featureSum = 0; // Another way of choosing FTvalue
             for (SF sf : m_SB[SBid].features)
             {
                 featureSum += sf.factor * m_SB[SBid].C[sf.sensor];
@@ -536,12 +532,11 @@ void cLF_tree::createFeature(size_t SBid)
 
 void cLF_tree::splitSB(size_t SBid, int cxx)
 {
-    // Splitting adds two SBs,  but removes one SB which now stores the feature and threshold defining the split.
+    // Splitting adds two SBs,  but removes one leaf SB which now does branching
     int nSensors = m_nSensors;
     size_t SSBid = createSB(); // Create two child SBs N.B. Before this, we have to make sure they will each have enough images.
     size_t DSBid = createSB();
-    ++leafCount; // An SB changing to a node of the feature tree removes one SB
-    // Two SBs created and one changed amounts to one more SB per split.
+    --leafCount; // We created two leaf SBs, but changing the leaf parent to a branching node of the LF-tree removes one leaf SB
     // Set the children's activity like SBid's activity
     size_t sensorIndex = 0;
     size_t sensor = 0;
@@ -553,10 +548,10 @@ void cLF_tree::splitSB(size_t SBid, int cxx)
         m_SB[DSBid].active.push_back(sensor);
         ++sensorIndex;
     }
-    // Assign the image numbers to the S or D children
+    // Assign the image numbers to the S (left) or D (right) child
     size_t imageNo = 0;
     // Compute the feature values of the images whose numbers are on SBid for distribution of the numbers to the children
-    m_SB[SSBid].C.assign(nSensors + 1, 0);
+    m_SB[SSBid].C.assign(nSensors + 1, 0); // Make room for the output centroid
     m_SB[DSBid].C.assign(nSensors + 1, 0);
     int Sn = 0; int Dn = 0;
     size_t local_imageNo = 0;
@@ -566,7 +561,7 @@ void cLF_tree::splitSB(size_t SBid, int cxx)
         // compute the feature value of the image
         double featureSum = 0;
         for (auto sf : m_SB[SBid].features)  featureSum += (double)train_images[imageNo].pixels[sf.sensor] * sf.factor;
-        // Use the feature to compute the centroids of the children and to distribute the image numberss to the children
+        // Use the feature to compute the centroids of the children and to distribute the image numbers to the children
         sensor = 0;
         while (sensor < nSensors)
         {
@@ -594,7 +589,6 @@ void cLF_tree::splitSB(size_t SBid, int cxx)
         }
         ++local_imageNo;
     }
-    assert(Sn >= minSamples2Split && Dn >= minSamples2Split);
     sensor = 0;
     while (sensor < nSensors)
     {
@@ -618,7 +612,7 @@ void cLF_tree::splitSB(size_t SBid, int cxx)
     case 4: m_SB[DSBid].is_final = true; m_SB[DSBid].C[nSensors] = 0; break;
     case 5:;
     }
-    // Set the parent and children in the feature tree
+    // Set the parent and child indices in the LF-tree for branching
     m_SB[SSBid].FTparent = m_SB[DSBid].FTparent = SBid;
     m_SB[SBid].FTS = SSBid;
     m_SB[SBid].FTD = DSBid;
@@ -719,16 +713,12 @@ void cLF_tree::makeSBfinal(size_t SBid)
     m_SB[SBid].features.clear();
     if( m_SB[SBid].image_numbers.size() < m_SB[SBid].active.size()) m_SB[SBid].active.clear();
     m_SB[SBid].image_numbers.clear();
-   // free(m_SB[SBid].pLS);
-    //m_SB[SBid].pLS = nullptr;
 }
 
 void cLF_tree::makeFTnode(size_t SBid) // After splitting, a non-final leaf becomes a feature tree node. The feature vector and FTvalue are kept.
 {
     m_SB[SBid].is_final = true;
     m_SB[SBid].image_numbers.clear();
-   // free(m_SB[SBid].pLS);
-    //m_SB[SBid].pLS = nullptr;
 }
 
 void cLF_tree::checkFinalTree()
@@ -790,7 +780,7 @@ void cLF_tree::convolution( std::vector<SF>& featureVector)
     for (int j = 0; j < fV.size();++j)
     {
         // We have to add weight to the vectorOut at sensors around sf.sensor of vectorIn
-        // We try a seven by seven convolution kernel
+        // We try a seven by seven convolution kernel (this box is too large)
         if (fV[j].factor == 0) continue;
         size_t H = fV[j].sensor % 28;
         size_t V = fV[j].sensor / 28;
