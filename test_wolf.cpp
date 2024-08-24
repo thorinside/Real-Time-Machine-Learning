@@ -109,6 +109,7 @@ int main(int argc, char* argv[])
     std::cout << "Mean time to grow a Learning Feature Tree         " << trainTime.count() / (double) numberLF_trees << " seconds." << std::endl;
     std::cout << "Mean leaf count of the Learning Feature Trees     " << leafCount / (double) numberLF_trees << std::endl;
     std::cout << "Estimated parallel training time                  " << tparallel << " seconds. " << std::endl;
+    createKernel();
     testOnTRAINING_SET(numberLF_trees, apLF_tree);
     free(train_images);
     free(train_labels);

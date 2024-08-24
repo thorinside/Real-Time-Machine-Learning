@@ -208,7 +208,6 @@ void cLF_tree::growTree()
     double  y{ 0 }; // y is the reinforcement for the given action and image label.
     std::vector<size_t> stayActive{}; // This temporarily records the remaining active sensors prior to elimination of some from the active list
     double accu = 0;
-    std::vector<int> sign{};
     for ( SBid = 0; SBid < m_SB.size(); ++SBid)  // for ( SBid = 0; SBid < size_m_SB; ++SBid) uses iterations
     {
         if (m_SB[SBid].is_final == false && m_SB[SBid].image_numbers.size() > 0)
@@ -219,7 +218,7 @@ void cLF_tree::growTree()
                 m_SB[0].C = initC; // presomputed to save time
                 for (sensor = 0; sensor < nSensors; ++sensor)
                 {
-                    m_SB[SBid].C[sensor] *= (0.4 + (double)m_treeNo / (double)numberLF_trees); // multiplicative shift keeps things positive even for pixels near 0 intensity
+                    m_SB[SBid].C[sensor] *= (0.5 + (double)m_treeNo / (double)numberLF_trees); // multiplicative shift keeps things positive even for pixels near 0 intensity
                     // This shift of the centroid should make all the trees used in a weighted average different
                 }
             }
@@ -756,31 +755,40 @@ void cLF_tree::checkFinalTree()
 
 void createKernel()
 {
-    double dist;
+    double rho = (convolutionRadius < 3.1) ? 0 : 1.0; // First a round kernel; then a horizontal one
+    double d= 0;
     double accu = 0;
     for (int h = 0; h < 7; ++h)
     {
         for (int v = 0; v < 7; ++v)
         {
-            dist = sqrt(pow(2, h - 3) + pow(2, v - 3))/ convolutionRadius; // min = 0 max = 1.0 at radius 2.0 using Euclidean disance
-            if(dist <= 1.0) accu += kernel[7 * v + h] = 2.0 * pow(3, dist) - 3.0 * pow(2, dist) + 1.0;
+            d = sqrt((h - 3) * (h - 3) + (v - 3) * (v - 3))/ convolutionRadius;
+            kernel[7 * v + h] =   (1.0 - rho)  *  (d < 1.0) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0;
+            kernel[7 * v + h] +=   rho * (d < 1.0 && v == 3) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0;
+            accu += kernel[7 * v + h];
         }
     }
-    // Make the weighs of the kernel sum to 1
-    for (int i = 0; i < 49; ++i) if(accu > 0) kernel[i] /= accu;
-}
+    std::cout << "\nKernel for this run\n";
+    // Make the weights of the kernel sum to 1.0
+    for (int i = 0; i < 49; ++i)
+    {
+        kernel[i] /= accu;
+        if (i % 7 == 0) std::cout << std::endl; std::cout << kernel[i] << " ";
+    }
+    std::cout << std::endl;
+} // End of createKernel
 
 void cLF_tree::convolution( std::vector<SF>& featureVector)
 {
-    std::vector<SF> fV = featureVector;
+    std::vector<SF> fV = featureVector; // fV is a copy of the original featureVector
     SF sf0{ 0,0 };
     featureVector.assign(784, sf0);
     size_t k = 0;
     double value = 0;
     for (int j = 0; j < fV.size();++j)
     {
-        // We have to add weight to the vectorOut at sensors around sf.sensor of vectorIn
-        // We try a seven by seven convolution kernel (this box is too large)
+        // We have to add weight to featureVector at sensors around the current sensor of fV
+        // We use a seven x seven convolution kernel
         if (fV[j].factor == 0) continue;
         size_t H = fV[j].sensor % 28;
         size_t V = fV[j].sensor / 28;
@@ -798,5 +806,12 @@ void cLF_tree::convolution( std::vector<SF>& featureVector)
                 }
             }
         }
+    }
+    //We can purge from featureVector the factor zero entries
+    fV = featureVector;
+    featureVector.clear();
+    for (int j = 0; j < fV.size(); ++j)
+    {
+        if (fV[j].factor != 0) featureVector.push_back(fV[j]);
     }
 }
