@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
         "\nNumber of Learning Feature Trees (multiple of 10) " << argv[3] << "\nMinimum images per block allowing split           " <<
         argv[4] << "\nSensor constant if std. dev. less than            " << argv[5] <<
         "\nConvolution kernel radius                         " << argv[6] << std::endl;
-    std::cout << "\nResults of testing on TRAINING DATA --  perhaps useful for develoment \n";
+    std::cout << "\nResults of testing on TRAINING DATA --  perhaps useful for development \n";
     std::cout << "Mean time to grow a Learning Feature Tree         " << trainTime.count() / (double) numberLF_trees << " seconds." << std::endl;
     std::cout << "Mean leaf count of the Learning Feature Trees     " << leafCount / (double) numberLF_trees << std::endl;
     std::cout << "Estimated parallel training time                  " << tparallel << " seconds. " << std::endl;
