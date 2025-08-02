@@ -26,8 +26,8 @@ SOFTWARE. */
 #include <assert.h>
 #include "mnist_file.h"
 #include "wolf.h"
-const char* train_image_path = "..\\Data\\train-images.idx3-ubyte"; // Original MNIST images
-const char* train_label_path = "..\\Data\\train-labels.idx1-ubyte"; // Original MNIST labels
+const char* train_image_path = "Data/train-images.idx3-ubyte"; // Original MNIST images
+const char* train_label_path = "Data/train-labels.idx1-ubyte"; // Original MNIST labels
 mnist_image_t* train_images;
 uint8_t* train_labels;
 size_t treeNo; // Index of an LF_tree
@@ -153,8 +153,8 @@ void testOnTEST_SET(int numberLF_trees, cLF_tree** apLF_tree)
     // Comparing groups of trees with different actions allows the system
     // to choose the action with highest probability of being correct. 
     uint32_t numberoftestimages = 10000;
-    const char* test_image_path = "..\\Data\\t10k-images.idx3-ubyte";
-    const char* test_labels_path = "..\\Data\\t10k-labels.idx1-ubyte";
+    const char* test_image_path = "Data/t10k-images.idx3-ubyte";
+    const char* test_labels_path = "Data/t10k-labels.idx1-ubyte";
     auto test_images = (mnist_image_t*)malloc(numberoftestimages * sizeof(mnist_image_t));
     auto test_labels = (uint8_t*)malloc(numberoftestimages * sizeof(uint8_t));
     test_images = get_images(test_image_path, &numberoftestimages);

@@ -25,6 +25,7 @@ SOFTWARE. */
 #include <array>
 #include <assert.h>
 #include <iostream>
+#include <cfloat>
 // WOLF stands for Weighted Overlapping Linear Functions, the approximation method used.
 extern int numberLF_trees;
 extern int minSamples2Split;
@@ -763,8 +764,8 @@ void createKernel()
         for (int v = 0; v < 7; ++v)
         {
             d = sqrt((h - 3) * (h - 3) + (v - 3) * (v - 3))/ convolutionRadius;
-            kernel[7 * v + h] =   (1.0 - rho)  *  (d < 1.0) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0;
-            kernel[7 * v + h] +=   rho * (d < 1.0 && v == 3) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0;
+            kernel[7 * v + h] =   (1.0 - rho)  *  ((d < 1.0) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0);
+            kernel[7 * v + h] +=   rho * ((d < 1.0 && v == 3) ? (1.0 - 3.0 * d * d + 2.0 * d * d * d) : 0);
             accu += kernel[7 * v + h];
         }
     }
